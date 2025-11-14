@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Operación Aritmética (Flask + MySQL)</title>
+  <style>
+    :root{
+      --c1:#503459;  /* fondo principal */
+      --c2:#81638b;  /* tarjeta / hover */
+      --c3:#b695c0;  /* botones / acentos */
+      --c4:#dac9df;  /* inputs / bordes suaves */
+      --c5:#ffffff;  /* texto */
+    }
+
+    *{box-sizing:border-box}
+    body{
+      margin:0; min-height:100vh;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      font-family: system-ui, Arial, sans-serif;
+      background: var(--c1);
+      color: var(--c5);
+      padding: 24px;
+    }
+
+    h2{ margin:0 0 16px; font-weight:700; letter-spacing:.2px; }
+
+    .card{
+      width:min(520px, 100%);
+      background: linear-gradient(180deg, var(--c2), var(--c3));
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius:16px;
+      padding:24px;
+      box-shadow: 0 12px 30px rgba(0,0,0,.25);
+    }
+
+    label{ display:block; margin:8px 0 6px; font-weight:600; }
+    input[type="text"]{
+      width:100%;
+      padding:12px 14px;
+      border-radius:10px;
+      border:2px solid var(--c4);
+      background: var(--c4);
+      color:#2a1836;   /* buen contraste sobre c4 */
+      font-size:16px;
+      outline:none;
+      transition: border .2s, box-shadow .2s;
+    }
+    input::placeholder{ color:#6e5578; }
+    input:focus{
+      border-color: var(--c5);
+      box-shadow: 0 0 0 3px rgba(255,255,255,.18);
+    }
+
+    .actions{
+      display:flex; gap:12px; margin-top:14px;
+    }
+    button{
+      padding:12px 18px;
+      border:none; border-radius:10px;
+      background: var(--c3); color: var(--c5);
+      font-weight:700; cursor:pointer; font-size:15px;
+      transition: transform .05s ease, background .2s ease;
+    }
+    button:hover{ background: var(--c2); }
+    button:active{ transform: translateY(1px); }
+
+    .result{
+      margin-top:16px;
+      background: rgba(255,255,255,.1);
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:12px;
+      padding:14px;
+      color: var(--c5);
+      word-break: break-word;
+    }
+
+    .muted{ color: #f2eaf7; opacity:.9; }
+    footer{ margin-top:18px; color:#f2eaf7; opacity:.8; font-size:12px; }
+    a{ color:#fefefe }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h2>Calculadora Aritmética</h2>
+    <p class="muted">Flask + MySQL • Guarda IP pública, operación, resultado y fecha</p>
+
+    <form id="calcForm">
+      <label for="exp">Escribe la operación</label>
+      <input id="exp" name="exp" type="text" placeholder="Ej: 3*(2+5)-10" required />
+      <div class="actions">
+        <button type="submit">Enviar</button>
+        <button type="reset">Limpiar</button>
+      </div>
+    </form>
+
+    <div id="result" class="result" hidden></div>
+  </div>
+
+  <footer>Paleta: #503459 • #81638b • #b695c0 • #dac9df • #ffffff</footer>
+
+  <script>
+  // URL del Webhook n8n
+  const WEBHOOK_URL = "https://zyanya-camila.app.n8n.cloud/webhook/ai-operationAWS";
+
+  const form = document.getElementById("calcForm");
+  const resultEl = document.getElementById("result");
+
+  // Obtener IP pública desde el navegador
+  async function obtenerIPPublica() {
+    const res = await fetch("https://api.ipify.org?format=json");
+    if (!res.ok) throw new Error("No se pudo obtener la IP pública");
+    const data = await res.json();
+    return data.ip; // <-- IP real del cliente
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const exp = document.getElementById("exp").value.trim();
+    if (!exp) return;
+
+    resultEl.hidden = false;
+    resultEl.textContent = "Procesando…";
+
+    try {
+      // Fecha/hora del cliente
+      const ahora = new Date();
+      const fechaCliente = ahora.toISOString().replace("T", " ").slice(0, 19);
+
+      // 1) IP pública del cliente
+      const ip = await obtenerIPPublica();
+
+      // 2) Enviar todo al Webhook de n8n
+      const res = await fetch(WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          exp: exp,
+          client_datetime: fechaCliente,
+          ip_publica: ip          // <-- la mandamos aquí
+        })
+      });
+
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error("El webhook no devolvió un JSON válido.");
+      }
+
+      if (res.ok && data.ok) {
+        resultEl.innerHTML = `
+          <b>Operación:</b> ${data.operacion}<br/>
+          <b>Resultado (OpenAI):</b> ${data.resultado}<br/>
+          <b>IP pública:</b> ${data.ip_publica || 'No detectada'}<br/>
+          <b>Fecha (cliente):</b> ${data.fecha_hora}<br/>
+          <hr>
+          <span class="muted">La operación fue procesada por n8n + OpenAI y almacenada en la base de datos.</span>
+        `;
+      } else {
+        resultEl.textContent = data.error || "Hubo un problema al procesar la operación.";
+      }
+
+    } catch (err) {
+      console.error(err);
+      resultEl.textContent = err.message || "Error de conexión con el Webhook.";
+    }
+  });
+</script>
+
+
+</body>
+</html>
