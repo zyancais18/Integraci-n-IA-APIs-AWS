@@ -112,7 +112,7 @@
     const res = await fetch("https://api.ipify.org?format=json");
     if (!res.ok) throw new Error("No se pudo obtener la IP pública");
     const data = await res.json();
-    return data.ip; // <-- IP real del cliente
+    return data.ip; // IP real del cliente
   }
 
   form.addEventListener("submit", async (e) => {
@@ -138,7 +138,7 @@
         body: JSON.stringify({
           exp: exp,
           client_datetime: fechaCliente,
-          ip_publica: ip          // <-- la mandamos aquí
+          ip_publica: ip
         })
       });
 
@@ -150,6 +150,7 @@
       }
 
       if (res.ok && data.ok) {
+        // 👇 AQUÍ ya se muestran operación, resultado, IP y fecha en texto
         resultEl.innerHTML = `
           <b>Operación:</b> ${data.operacion}<br/>
           <b>Resultado (OpenAI):</b> ${data.resultado}<br/>
@@ -170,7 +171,9 @@
 </script>
 
 
+
 </body>
 </html>
+
 
 
